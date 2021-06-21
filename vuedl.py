@@ -71,6 +71,10 @@ def save_config(filename: str, config: ConfigParser):
         config.write(f)
 
 def main():
+    verbose = False
+    if "-v" in sys.argv:
+        verbose = True
+
     config_file = "/etc/vuedl.conf"
     config = ConfigParser()
     config.read(config_file)
@@ -87,6 +91,8 @@ def main():
     if (delta.days == 0 and delta.seconds < 60):
         sys.exit("Less than one minute between start and end, abort.")
 
+    if verbose: print("Obtaining data between", start, "and", end)
+
     username = config.get("config", "username")
     password = config.get("config", "password")
     api_url = config.get("config", "api_url")
@@ -99,27 +105,34 @@ def main():
     token_expiration = datetime.fromisoformat(token_expiration_str) if len(token_expiration_str) else datetime.utcnow()
 
     if (datetime.now(timezone.utc) + timedelta(seconds=30) > token_expiration):
+        if verbose: print("Need to obtain token")
         token, token_expiration = get_token(username, password, auth_url, client_id)
         config.set("runtime", "token", token)
         config.set("runtime", "token_expiration", token_expiration.isoformat())
         save_config(config_file, config)
+        if verbose: print("Token obtained, expires", token_expiration)
 
     customer_gid = config.getint("runtime", "customer_gid") if config.has_option("runtime", "customer_gid") else 0
     if (customer_gid == 0):
+        if verbose: print("Need to obtain customer GID")
         customer_gid = get_customer_gid(username, token, api_url)
         config.set("runtime", "customer_gid", str(customer_gid))
         save_config(config_file, config)
+        if verbose: print("Customer GID obtained, GID =", customer_gid)
 
     device_gids = get_device_gids(customer_gid, token, api_url)
 
     for device_gid in device_gids:
+        if verbose: print("Obtain usage data for device", device_gid)
         usage_data = get_device_usage_data(device_gid, start, end, token, api_url)
         filename = data_folder + "vue_" + str(device_gid) + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + ".json"
         with open(filename, "w") as f:
             f.write(usage_data)
+        if verbose: print(usage_data)
 
     config.set("runtime", "last_run", end.isoformat())
     save_config(config_file, config)
+    if verbose: print("Done!")
 
 if __name__ == "__main__":
   main()
