@@ -6,7 +6,7 @@ from datetime import timedelta
 from datetime import timezone
 import requests
 
-def get_token(username: str, password: str, auth_url: str, client_id: str) -> tuple[str, datetime]:
+def get_token(username: str, password: str, auth_url: str, client_id: str):
     response = requests.post(
         auth_url,
         headers={
@@ -39,7 +39,7 @@ def get_customer_gid(email: str, token: str, api_url: str) -> int:
     customer_gid = str(json["customerGid"])
     return int(customer_gid)
 
-def get_device_gids(customer_gid: int, token: str, api_url: str) -> list[int]:
+def get_device_gids(customer_gid: int, token: str, api_url: str):
     response = requests.get(
         api_url + "/customers/" + str(customer_gid) + "/devices",
         headers = {"authtoken": token}
