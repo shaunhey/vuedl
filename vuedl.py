@@ -26,7 +26,6 @@ def get_token(username: str, password: str, auth_url: str, client_id: str):
     json = response.json()
     token = json["AuthenticationResult"]["IdToken"]
     token_expiration = datetime.now(timezone.utc) + timedelta(seconds = json["AuthenticationResult"]["ExpiresIn"])
-    print("Obtained token, expires at", token_expiration)
     return token, token_expiration
 
 def get_customer_gid(email: str, token: str, api_url: str) -> int:
@@ -98,32 +97,21 @@ def main():
     token_expiration = datetime.fromisoformat(token_expiration_str) if len(token_expiration_str) else datetime.utcnow()
 
     if (datetime.now(timezone.utc) + timedelta(seconds=30) > token_expiration):
-        print("Token expires in less than 30 seconds, need to get a new one...")
         token, token_expiration = get_token(username, password, auth_url, client_id)
         config.set("runtime", "token", token)
         config.set("runtime", "token_expiration", token_expiration.isoformat())
         save_config(config_file, config)
-    else:
-        print("Existing token is still valid, expires", token_expiration)
 
     customer_gid = config.getint("runtime", "customer_gid") if config.has_option("runtime", "customer_gid") else 0
     if (customer_gid == 0):
-        print("Need to obtain customer GID...")
         customer_gid = get_customer_gid(username, token, api_url)
         config.set("runtime", "customer_gid", str(customer_gid))
         save_config(config_file, config)
 
-    print("Customer GID:", customer_gid)
-
     device_gids = get_device_gids(customer_gid, token, api_url)
-    print("Device GIDs:", device_gids)
-
-    print("Obtaining usage data between", start, "and", end)
 
     for device_gid in device_gids:
-        print("Obtaining usage data for device", device_gid)
         usage_data = get_device_usage_data(device_gid, start, end, token, api_url)
-        print(usage_data)
         filename = data_folder + "vue_" + str(device_gid) + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + ".json"
         with open(filename, "w") as f:
             f.write(usage_data)
