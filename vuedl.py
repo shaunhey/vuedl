@@ -5,6 +5,7 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 import requests
+import sys
 
 def get_token(username: str, password: str, auth_url: str, client_id: str):
     response = requests.post(
@@ -84,8 +85,7 @@ def main():
 
     delta = end - start
     if (delta.days == 0 and delta.seconds < 60):
-        print("Less than one minute between start and end, abort.")
-        return
+        sys.exit("Less than one minute between start and end, abort.")
 
     username = config.get("config", "username")
     password = config.get("config", "password")
