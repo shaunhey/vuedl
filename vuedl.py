@@ -74,11 +74,13 @@ def main():
     config = ConfigParser()
     config.read(config_file)
 
-    start = datetime.fromisoformat(config.get("runtime", "last_run")) if config.has_option("runtime", "last_run") else datetime.now(timezone.utc) - timedelta(minutes=61)
-    start = truncate_seconds(start)
-
+    # Request data up until one minute ago
     end = datetime.now(timezone.utc) - timedelta(minutes=1)
     end = truncate_seconds(end)
+
+    # Request data starting from the last run, or 60 minutes ago if this is our first run
+    start = datetime.fromisoformat(config.get("runtime", "last_run")) if config.has_option("runtime", "last_run") else end - timedelta(minutes=60)
+    start = truncate_seconds(start)
 
     delta = end - start
     if (delta.days == 0 and delta.seconds < 60):
