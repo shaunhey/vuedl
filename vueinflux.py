@@ -17,6 +17,11 @@ def get_device_gid_from_filename(filename: str) -> str:
     end = filename.find("_", start)
     return filename[start:end]
 
+def get_scale_from_filename(filename: str) -> str:
+    end = filename.rfind(".")
+    start = filename.rfind("_") + 1
+    return filename[start:end]
+
 def main():
     verbose = False
     if "-v" in sys.argv:
@@ -38,6 +43,7 @@ def main():
 
     for filename in glob.glob(os.path.join(data_folder, "*.json")):
         device_gid = get_device_gid_from_filename(filename)
+        scale = get_scale_from_filename(filename)
         
         with open(filename) as file:
             if verbose: print("Processing", filename)
@@ -49,9 +55,12 @@ def main():
             os.makedirs(archive_folder, exist_ok = True)
             
             for usage in data["usageList"]:
-                point = Point("kWh").tag("device_gid", device_gid).field("usage", usage).time(time)
+                point = Point("kWh_" + scale).tag("device_gid", device_gid).field("usage", usage).time(time)
                 write_api.write(influxdb_bucket, influxdb_org, point)
-                time = time + timedelta(minutes=1)
+                if (scale == "1MIN"):
+                    time = time + timedelta(minutes=1)
+                elif (scale == "1S"):
+                    time = time + timedelta(seconds=1)
 
         new_path = os.path.join(archive_folder, os.path.basename(filename))
         if verbose: print("Moving", filename, "to", new_path)

@@ -51,13 +51,14 @@ def get_device_gids(customer_gid: int, token: str, api_url: str):
         device_gids.append(int(device["deviceGid"]))
     return device_gids
 
-def get_device_usage_data(device_gid: int, start: datetime, end: datetime, token: str, api_url: str) -> str:
+def get_device_usage_data(device_gid: int, start: datetime, end: datetime, scale: str, token: str, api_url: str) -> str:
     response = requests.get(
         api_url + "/AppAPI?apiMethod=getChartUsage&deviceGid=" + str(device_gid)
                 + "&channel=1,2,3"
                 + "&start=" + start.isoformat().replace("+00:00", "Z")
                 + "&end=" + end.isoformat().replace("+00:00", "Z")
-                + "&scale=1MIN&energyUnit=KilowattHours",
+                + "&scale=" + scale
+                + "&energyUnit=KilowattHours",
         headers = {"authtoken": token}
     )
     response.raise_for_status()
@@ -124,11 +125,12 @@ def main():
 
     for device_gid in device_gids:
         if verbose: print("Obtain usage data for device", device_gid)
-        usage_data = get_device_usage_data(device_gid, start, end, token, api_url)
-        filename = data_folder + "vue_" + str(device_gid) + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + ".json"
-        with open(filename, "w") as f:
-            f.write(usage_data)
-        if verbose: print(usage_data)
+        for scale in ["1MIN", "1S"]:
+            usage_data = get_device_usage_data(device_gid, start, end, scale, token, api_url)
+            filename = data_folder + "vue_" + str(device_gid) + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
+            with open(filename, "w") as f:
+                f.write(usage_data)
+            if verbose: print(usage_data)
 
     config.set("runtime", "last_run", end.isoformat())
     save_config(config_file, config)
