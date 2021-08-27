@@ -100,7 +100,7 @@ def main():
     auth_url = config.get("config", "auth_url")
     client_id = config.get("config", "client_id")
     data_folder = config.get("config", "data_folder")
-    
+
     token = config.get("runtime", "token")
     token_expiration_str = config.get("runtime", "token_expiration")
     token_expiration = datetime.fromisoformat(token_expiration_str) if len(token_expiration_str) else datetime.utcnow()
@@ -121,16 +121,20 @@ def main():
         save_config(config_file, config)
         if verbose: print("Customer GID obtained, GID =", customer_gid)
 
-    device_gids = get_device_gids(customer_gid, token, api_url)
+#    device_gids = get_device_gids(customer_gid, token, api_url)
+    device_gids = [45159, 47241, 44816]
 
     for device_gid in device_gids:
         if verbose: print("Obtain usage data for device", device_gid)
         for scale in ["1MIN", "1S"]:
-            usage_data = get_device_usage_data(device_gid, start, end, scale, token, api_url)
-            filename = data_folder + "vue_" + str(device_gid) + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
-            with open(filename, "w") as f:
-                f.write(usage_data)
-            if verbose: print(usage_data)
+            try:
+                usage_data = get_device_usage_data(device_gid, start, end, scale, token, api_url)
+                filename = data_folder + "vue_" + str(device_gid) + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
+                with open(filename, "w") as f:
+                    f.write(usage_data)
+                if verbose: print(usage_data)
+            except Exception as e:
+                print(e)
 
     config.set("runtime", "last_run", end.isoformat())
     save_config(config_file, config)
@@ -138,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
   main()
+
