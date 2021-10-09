@@ -133,10 +133,11 @@ def main():
         for scale in ["1MIN", "1S"]:
             try:
                 usage_data = get_device_usage_data(device_gid, channel, start, end, scale, token, api_url)
-                filename = data_folder + "vue_" + str(device_gid) + "_" + channel + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
-                with open(filename, "w") as f:
-                    f.write(usage_data)
-                if verbose: print(usage_data)
+                if len(usage_data) > 0:
+                    filename = data_folder + "vue_" + str(device_gid) + "_" + channel + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
+                    with open(filename, "w") as f:
+                        f.write(usage_data)
+                    if verbose: print(usage_data)
             except Exception as e:
                 print(e)
 
