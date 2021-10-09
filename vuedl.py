@@ -39,22 +39,26 @@ def get_customer_gid(email: str, token: str, api_url: str) -> int:
     customer_gid = str(json["customerGid"])
     return int(customer_gid)
 
-def get_device_gids(customer_gid: int, token: str, api_url: str):
+def get_devices(customer_gid: int, token: str, api_url: str):
     response = requests.get(
-        api_url + "/customers/" + str(customer_gid) + "/devices",
+        api_url + "/customers/devices",
         headers = {"authtoken": token}
     )
     response.raise_for_status()
     json = response.json()
-    device_gids = []
+    devices = []
     for device in json["devices"]:
-        device_gids.append(int(device["deviceGid"]))
-    return device_gids
+        for channel in device["channels"]:
+            devices.append({"device_gid": int(channel["deviceGid"]), "channel": channel["channelNum"]})
+        for sub_device in device["devices"]:
+            for sub_device_channel in sub_device["channels"]:
+                devices.append({"device_gid": int(sub_device_channel["deviceGid"]), "channel": sub_device_channel["channelNum"]})
+    return devices
 
-def get_device_usage_data(device_gid: int, start: datetime, end: datetime, scale: str, token: str, api_url: str) -> str:
+def get_device_usage_data(device_gid: int, channel: str, start: datetime, end: datetime, scale: str, token: str, api_url: str) -> str:
     response = requests.get(
         api_url + "/AppAPI?apiMethod=getChartUsage&deviceGid=" + str(device_gid)
-                + "&channel=1,2,3"
+                + "&channel=" + channel
                 + "&start=" + start.isoformat().replace("+00:00", "Z")
                 + "&end=" + end.isoformat().replace("+00:00", "Z")
                 + "&scale=" + scale
@@ -121,15 +125,15 @@ def main():
         save_config(config_file, config)
         if verbose: print("Customer GID obtained, GID =", customer_gid)
 
-#    device_gids = get_device_gids(customer_gid, token, api_url)
-    device_gids = [45159, 47241, 44816]
-
-    for device_gid in device_gids:
-        if verbose: print("Obtain usage data for device", device_gid)
+    devices = get_devices(customer_gid, token, api_url)
+    for device in devices:
+        device_gid = device["device_gid"]
+        channel = device["channel"]
+        if verbose: print("Obtain usage data for device", device_gid, "channel", channel)
         for scale in ["1MIN", "1S"]:
             try:
-                usage_data = get_device_usage_data(device_gid, start, end, scale, token, api_url)
-                filename = data_folder + "vue_" + str(device_gid) + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
+                usage_data = get_device_usage_data(device_gid, channel, start, end, scale, token, api_url)
+                filename = data_folder + "vue_" + str(device_gid) + "_" + channel + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
                 with open(filename, "w") as f:
                     f.write(usage_data)
                 if verbose: print(usage_data)
