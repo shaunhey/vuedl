@@ -13,14 +13,13 @@ import os
 import sys
 
 def get_device_gid_from_filename(filename: str) -> str:
-    start = filename.find("_") + 1
-    end = filename.find("_", start)
-    return filename[start:end]
+    return filename.split("_")[1]
+
+def get_channel_from_filename(filename: str) -> str:
+    return filename.split("_")[2]
 
 def get_scale_from_filename(filename: str) -> str:
-    end = filename.rfind(".")
-    start = filename.rfind("_") + 1
-    return filename[start:end]
+    return filename.split("_")[4].split(".")[0]
 
 def main():
     verbose = False
@@ -43,6 +42,7 @@ def main():
 
     for filename in glob.glob(os.path.join(data_folder, "*.json")):
         device_gid = get_device_gid_from_filename(filename)
+        channel = get_channel_from_filename(filename)
         scale = get_scale_from_filename(filename)
         
         with open(filename) as file:
@@ -55,7 +55,8 @@ def main():
             os.makedirs(archive_folder, exist_ok = True)
             
             for usage in data["usageList"]:
-                point = Point("kWh_" + scale).tag("device_gid", device_gid).field("usage", usage).time(time)
+                point = Point("kWh_" + scale).tag("device_gid", device_gid).tag("channel", channel).field("usage", usage).time(time)
+                if verbose: print(time, scale, device_gid, channel, usage)
                 write_api.write(influxdb_bucket, influxdb_org, point)
                 if (scale == "1MIN"):
                     time = time + timedelta(minutes=1)
