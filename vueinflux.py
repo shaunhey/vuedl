@@ -54,12 +54,14 @@ def main():
             archive_folder = os.path.join(data_folder, "archive", time.strftime("%Y-%m-%d"))
             os.makedirs(archive_folder, exist_ok = True)
             
+            last_usage = 0.0
             for usage in data["usageList"]:
-
-                if usage is not None:
+                
+                if usage is not None and usage != last_usage:
                     point = Point("kWh_" + scale).tag("device_gid", device_gid).tag("channel", channel).field("usage", usage).time(time)
                     if verbose: print(time, scale, device_gid, channel, usage)
                     write_api.write(influxdb_bucket, influxdb_org, point)
+                    last_usage = usage
 
                 if (scale == "1MIN"):
                     time = time + timedelta(minutes=1)
