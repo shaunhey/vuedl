@@ -55,9 +55,12 @@ def main():
             os.makedirs(archive_folder, exist_ok = True)
             
             for usage in data["usageList"]:
-                point = Point("kWh_" + scale).tag("device_gid", device_gid).tag("channel", channel).field("usage", usage).time(time)
-                if verbose: print(time, scale, device_gid, channel, usage)
-                write_api.write(influxdb_bucket, influxdb_org, point)
+
+                if usage is not None:
+                    point = Point("kWh_" + scale).tag("device_gid", device_gid).tag("channel", channel).field("usage", usage).time(time)
+                    if verbose: print(time, scale, device_gid, channel, usage)
+                    write_api.write(influxdb_bucket, influxdb_org, point)
+
                 if (scale == "1MIN"):
                     time = time + timedelta(minutes=1)
                 elif (scale == "1S"):
