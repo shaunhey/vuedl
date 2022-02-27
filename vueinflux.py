@@ -58,7 +58,7 @@ def main():
             last_usage = 0.0
             for usage in data["usageList"]:
 
-                if usage is not None and usage != last_usage:
+                if usage is not None:
                     point = Point("kWh_" + scale).tag("device_gid", device_gid).tag("channel", channel).field("usage", usage).time(t)
                     if verbose: print(t, scale, device_gid, channel, usage)
                     for i in range(3):
