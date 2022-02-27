@@ -6,6 +6,7 @@ from datetime import timedelta
 from datetime import timezone
 import requests
 import sys
+import time
 
 def get_token(username: str, password: str, auth_url: str, client_id: str):
     response = requests.post(
@@ -117,6 +118,7 @@ def main():
         save_config(config_file, config)
         if verbose: print("Token obtained, expires", token_expiration)
 
+    time.sleep(1)
     customer_gid = config.getint("runtime", "customer_gid") if config.has_option("runtime", "customer_gid") else 0
     if (customer_gid == 0):
         if verbose: print("Need to obtain customer GID")
@@ -125,21 +127,29 @@ def main():
         save_config(config_file, config)
         if verbose: print("Customer GID obtained, GID =", customer_gid)
 
+    time.sleep(1)
     devices = get_devices(customer_gid, token, api_url)
     for device in devices:
         device_gid = device["device_gid"]
         channel = device["channel"]
         if verbose: print("Obtain usage data for device", device_gid, "channel", channel)
-        for scale in ["1MIN", "1S"]:
-            try:
-                usage_data = get_device_usage_data(device_gid, channel, start, end, scale, token, api_url)
-                if len(usage_data) > 0:
-                    filename = data_folder + "vue_" + str(device_gid) + "_" + channel + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
-                    with open(filename, "w") as f:
-                        f.write(usage_data)
-                    if verbose: print(usage_data)
-            except Exception as e:
-                print(e)
+        for i in range(3):
+            for scale in ["1MIN", "1S"]:
+                try:
+                    time.sleep(1)
+                    usage_data = get_device_usage_data(device_gid, channel, start, end, scale, token, api_url)
+                    if len(usage_data) > 0:
+                        filename = data_folder + "vue_" + str(device_gid) + "_" + channel + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
+                        with open(filename, "w") as f:
+                            f.write(usage_data)
+                        if verbose: print(usage_data)
+                        break
+                except Exception as e:
+                    print(e)
+                    if i == 2:
+                        raise
+                    print("wait 30 seconds and try again")
+                    time.sleep(30)
 
     config.set("runtime", "last_run", end.isoformat())
     save_config(config_file, config)
