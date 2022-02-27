@@ -85,13 +85,13 @@ def main():
     config = ConfigParser()
     config.read(config_file)
 
-    # Request data up until one minute ago
-    end = datetime.now(timezone.utc) - timedelta(minutes=1)
+    # Request data up until 5 minutes ago
+    end = datetime.now(timezone.utc)
     end = truncate_seconds(end)
+    end = end - timedelta(minutes=5, seconds=1)
 
     # Request data starting from the last run, or 60 minutes ago if this is our first run
-    start = datetime.fromisoformat(config.get("runtime", "last_run")) if config.has_option("runtime", "last_run") else end - timedelta(minutes=60)
-    start = truncate_seconds(start)
+    start = datetime.fromisoformat(config.get("runtime", "last_run")) + timedelta(seconds=1) if config.has_option("runtime", "last_run") else end - timedelta(minutes=60)
 
     delta = end - start
     if (delta.days == 0 and delta.seconds < 60):
@@ -134,7 +134,7 @@ def main():
         channel = device["channel"]
         if verbose: print("Obtain usage data for device", device_gid, "channel", channel)
         for i in range(3):
-            for scale in ["1MIN", "1S"]:
+            for scale in ["1MIN"]:
                 try:
                     time.sleep(1)
                     usage_data = get_device_usage_data(device_gid, channel, start, end, scale, token, api_url)
