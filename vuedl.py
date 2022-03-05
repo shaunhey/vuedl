@@ -4,12 +4,45 @@ from configparser import ConfigParser
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
+import logging
 import requests
 import sys
 import time
 
+logging.basicConfig(filename="/var/log/vuedl.log", level=logging.DEBUG, format="%(asctime)s: [%(name)s] [%(levelname)s] %(message)s")
+
+def logging_hook(res: requests.Response, *args, **kwargs):
+    req = res.request
+
+    logging.debug("================================================================================")
+
+    logging.debug(f"{req.method:6} {req.url}")
+
+    if req.headers is not None:
+        for header in req.headers:
+            logging.debug(f"{header}: {req.headers[header]}")
+
+    if req.body is not None:
+        logging.debug(req.body)
+
+    logging.debug("--------------------------------------------------------------------------------")
+
+    logging.debug(f"{res.status_code} {res.reason}")
+
+    if res.headers is not None:
+        for header in res.headers:
+            logging.debug(f"{header}: {res.headers[header]}")
+
+    if res.text is not None:
+        logging.debug(res.text)
+
+    logging.debug("================================================================================")
+
+api = requests.Session()
+api.hooks["response"] = [logging_hook]
+
 def get_token(username: str, password: str, auth_url: str, client_id: str):
-    response = requests.post(
+    response = api.post(
         auth_url,
         headers={
             "Content-Type": "application/x-amz-json-1.1",
@@ -31,7 +64,7 @@ def get_token(username: str, password: str, auth_url: str, client_id: str):
     return token, token_expiration
 
 def get_customer_gid(email: str, token: str, api_url: str) -> int:
-    response = requests.get(
+    response = api.get(
         api_url + "/customers" + "?email=" + email,
         headers = {"authtoken": token}
     )
@@ -41,7 +74,7 @@ def get_customer_gid(email: str, token: str, api_url: str) -> int:
     return int(customer_gid)
 
 def get_devices(customer_gid: int, token: str, api_url: str):
-    response = requests.get(
+    response = api.get(
         api_url + "/customers/devices",
         headers = {"authtoken": token}
     )
@@ -57,7 +90,7 @@ def get_devices(customer_gid: int, token: str, api_url: str):
     return devices
 
 def get_device_usage_data(device_gid: int, channel: str, start: datetime, end: datetime, scale: str, token: str, api_url: str) -> str:
-    response = requests.get(
+    response = api.get(
         api_url + "/AppAPI?apiMethod=getChartUsage&deviceGid=" + str(device_gid)
                 + "&channel=" + channel
                 + "&start=" + start.isoformat().replace("+00:00", "Z")
