@@ -4,6 +4,8 @@ from configparser import ConfigParser
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
+from requests import HTTPError
+from typing import List, Tuple
 import logging
 import requests
 import sys
@@ -38,11 +40,8 @@ def logging_hook(res: requests.Response, *args, **kwargs):
 
     logging.debug("================================================================================")
 
-api = requests.Session()
-api.hooks["response"] = [logging_hook]
-
-def get_token(username: str, password: str, auth_url: str, client_id: str):
-    response = api.post(
+def get_token(session: requests.Session, username: str, password: str, auth_url: str, client_id: str) -> Tuple[str, datetime]:
+    response = session.post(
         auth_url,
         headers={
             "Content-Type": "application/x-amz-json-1.1",
@@ -63,9 +62,9 @@ def get_token(username: str, password: str, auth_url: str, client_id: str):
     token_expiration = datetime.now(timezone.utc) + timedelta(seconds = json["AuthenticationResult"]["ExpiresIn"])
     return token, token_expiration
 
-def get_customer_gid(email: str, token: str, api_url: str) -> int:
-    response = api.get(
-        api_url + "/customers" + "?email=" + email,
+def get_customer_gid(session: requests.Session, email: str, token: str, api_url: str) -> int:
+    response = session.get(
+        api_url + "/customers?email=" + email,
         headers = {"authtoken": token}
     )
     response.raise_for_status()
@@ -73,8 +72,8 @@ def get_customer_gid(email: str, token: str, api_url: str) -> int:
     customer_gid = str(json["customerGid"])
     return int(customer_gid)
 
-def get_devices(customer_gid: int, token: str, api_url: str):
-    response = api.get(
+def get_devices(session: requests.Session, customer_gid: int, token: str, api_url: str) -> List[object]:
+    response = session.get(
         api_url + "/customers/devices",
         headers = {"authtoken": token}
     )
@@ -89,8 +88,8 @@ def get_devices(customer_gid: int, token: str, api_url: str):
                 devices.append({"device_gid": int(sub_device_channel["deviceGid"]), "channel": sub_device_channel["channelNum"]})
     return devices
 
-def get_device_usage_data(device_gid: int, channel: str, start: datetime, end: datetime, scale: str, token: str, api_url: str) -> str:
-    response = api.get(
+def get_device_usage_data(session: requests.Session, device_gid: int, channel: str, start: datetime, end: datetime, scale: str, token: str, api_url: str) -> str:
+    response = session.get(
         api_url + "/AppAPI?apiMethod=getChartUsage&deviceGid=" + str(device_gid)
                 + "&channel=" + channel
                 + "&start=" + start.isoformat().replace("+00:00", "Z")
@@ -143,46 +142,53 @@ def main():
     token_expiration_str = config.get("runtime", "token_expiration")
     token_expiration = datetime.fromisoformat(token_expiration_str) if len(token_expiration_str) else datetime.utcnow()
 
+    session = requests.Session()
+    session.hooks["response"] = [logging_hook]
+
     if (datetime.now(timezone.utc) + timedelta(seconds=30) > token_expiration):
         if verbose: print("Need to obtain token")
-        token, token_expiration = get_token(username, password, auth_url, client_id)
+        token, token_expiration = get_token(session, username, password, auth_url, client_id)
         config.set("runtime", "token", token)
         config.set("runtime", "token_expiration", token_expiration.isoformat())
         save_config(config_file, config)
         if verbose: print("Token obtained, expires", token_expiration)
 
-    time.sleep(1)
+    time.sleep(1) # sleeps just to be nice to their API
     customer_gid = config.getint("runtime", "customer_gid") if config.has_option("runtime", "customer_gid") else 0
     if (customer_gid == 0):
         if verbose: print("Need to obtain customer GID")
-        customer_gid = get_customer_gid(username, token, api_url)
+        customer_gid = get_customer_gid(session, username, token, api_url)
         config.set("runtime", "customer_gid", str(customer_gid))
         save_config(config_file, config)
         if verbose: print("Customer GID obtained, GID =", customer_gid)
 
     time.sleep(1)
-    devices = get_devices(customer_gid, token, api_url)
+    devices = get_devices(session, customer_gid, token, api_url)
     for device in devices:
         device_gid = device["device_gid"]
         channel = device["channel"]
+        scale = "1MIN"
         if verbose: print("Obtain usage data for device", device_gid, "channel", channel)
-        for i in range(3):
-            for scale in ["1MIN"]:
-                try:
-                    time.sleep(1)
-                    usage_data = get_device_usage_data(device_gid, channel, start, end, scale, token, api_url)
-                    if len(usage_data) > 0:
-                        filename = data_folder + "vue_" + str(device_gid) + "_" + channel + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
-                        with open(filename, "w") as f:
-                            f.write(usage_data)
-                        if verbose: print(usage_data)
-                        break
-                except Exception as e:
-                    print(e)
-                    if i == 2:
-                        raise
-                    print("wait 30 seconds and try again")
-                    time.sleep(30)
+        for retryNumber in range(3):
+            try:
+                time.sleep(1)
+                usage_data = get_device_usage_data(session, device_gid, channel, start, end, scale, token, api_url)
+                if len(usage_data) > 0:
+                    filename = data_folder + "vue_" + str(device_gid) + "_" + channel + "_" + start.isoformat().replace("+00:00", "Z") + "-" + end.isoformat().replace("+00:00", "Z") + "_" + scale + ".json"
+                    with open(filename, "w") as f:
+                        f.write(usage_data)
+                    if verbose: print(usage_data)
+                    break
+
+            except HTTPError as e:
+                print(e)
+
+                if retryNumber == 2:
+                    raise
+
+                print("Wait 30 seconds and try again")
+                logging.info("Wait 30 seconds and try again")
+                time.sleep(30)
 
     config.set("runtime", "last_run", end.isoformat())
     save_config(config_file, config)
